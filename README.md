@@ -56,3 +56,25 @@ The `deploy.sh` script is designed to automate the entire setup process. It will
     ```
 
 Your application is now fully deployed and accessible at `http://your-domain.com`.
+
+## Updating the Application
+
+After the initial deployment, you can use the `update.sh` script to deploy new code changes from your Git repository.
+
+### How to use
+
+1.  **Navigate to the project directory** on your server.
+
+2.  **Run the update script** with `sudo`.
+
+    ```bash
+    chmod +x update.sh
+    sudo ./update.sh
+    ```
+
+    The script will automatically:
+    -   Pull the latest code.
+    -   Install any new dependencies for the frontend and backend.
+    -   Re-build the frontend.
+    -   Apply any new database migrations.
+    -   Restart the backend server and Nginx.
