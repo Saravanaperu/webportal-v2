@@ -25,6 +25,8 @@ This section explains how to perform a fully automated deployment of the applica
 
 The `deploy.sh` script is designed to automate the entire setup process. It will install all necessary software (Nginx, PostgreSQL, Node.js, pm2), configure the database, build the applications, and set up the web server.
 
+**Note:** The script is safe to re-run. On its first run, it will set up the database and create the `backend/.env` file. On subsequent runs, it will detect that the setup is already complete and skip these steps to avoid overwriting your configuration.
+
 1.  **Clone the Repository**
     Clone this repository to your server.
     ```bash

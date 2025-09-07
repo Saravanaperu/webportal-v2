@@ -8,75 +8,53 @@
 # This script must be run with sudo privileges.
 
 # --- Configuration ---
-# You can change these variables if needed.
 DB_NAME="tradingbotdb"
 DB_USER="tradingbotuser"
-DB_PASS=$(openssl rand -hex 12) # Generate a random password
 APP_NAME="trading-bot"
 
 # --- Script Setup ---
-# Exit immediately if a command exits with a non-zero status.
 set -e
-
-# Check for root privileges
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run this script with sudo."
-  exit 1
-fi
-
-# Check for domain/IP argument
-if [ -z "$1" ]; then
-  echo "Usage: sudo $0 <your_domain_or_ip>"
-  exit 1
-fi
+if [ "$EUID" -ne 0 ]; then echo "Please run this script with sudo."; exit 1; fi
+if [ -z "$1" ]; then echo "Usage: sudo $0 <your_domain_or_ip>"; exit 1; fi
 SERVER_NAME=$1
 APP_PATH=$(pwd)
-
-# --- Helper Functions ---
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
 
 # --- 1. System-Wide Installation ---
 echo "--- 1. Installing System-Wide Dependencies ---"
 apt-get update
-# -y flag answers yes to all prompts
 apt-get install -y nodejs npm nginx postgresql postgresql-contrib
-
-# Install or update pm2
 npm install pm2 -g
-
 echo "All system dependencies are installed."
 echo ""
 
-# --- 2. Database Setup ---
-echo "--- 2. Setting up PostgreSQL Database ---"
-# Check if user and db exist, create if not.
-if ! sudo -u postgres psql -t -c '\du' | cut -d \| -f 1 | grep -qw "$DB_USER"; then
-    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';"
-    echo "PostgreSQL user '$DB_USER' created."
-else
-    echo "PostgreSQL user '$DB_USER' already exists."
-fi
+# --- 2. First-Time Database and .env Setup ---
+# This block only runs if the .env file does not exist.
+if [ ! -f "backend/.env" ]; then
+  echo "--- 2. Performing First-Time Database and .env Setup ---"
+  DB_PASS=$(openssl rand -hex 12) # Generate password only on first run
 
-if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
-    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
-    echo "PostgreSQL database '$DB_NAME' created."
-else
-    echo "PostgreSQL database '$DB_NAME' already exists."
-fi
-echo ""
+  # Create PostgreSQL user and database
+  if ! sudo -u postgres psql -t -c '\du' | cut -d \| -f 1 | grep -qw "$DB_USER"; then
+      sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';"
+      echo "PostgreSQL user '$DB_USER' created."
+  else
+      echo "PostgreSQL user '$DB_USER' already exists. Skipping user creation."
+  fi
 
-# --- 3. Backend Setup ---
-echo "--- 3. Setting up Backend ---"
-cd backend
+  if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+      sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
+      echo "PostgreSQL database '$DB_NAME' created."
+  else
+      echo "PostgreSQL database '$DB_NAME' already exists."
+  fi
 
-# Create .env file
-echo "Creating .env file with database credentials..."
-DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
-JWT_SECRET=$(openssl rand -hex 32)
+  # Create .env file
+  echo "Creating .env file with new database credentials..."
+  DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
+  JWT_SECRET=$(openssl rand -hex 32)
 
-cat > .env << EOF
+  cd backend
+  cat > .env << EOF
 DATABASE_URL="${DATABASE_URL}"
 JWT_SECRET="${JWT_SECRET}"
 
@@ -86,19 +64,38 @@ ANGEL_CLIENT_CODE=""
 ANGEL_PASSWORD=""
 ANGEL_TOTP=""
 EOF
+  cd ..
+  echo "IMPORTANT: .env file created in 'backend/' directory. You MUST add your Angel One credentials to it."
+  echo ""
+else
+  echo "--- 2. Skipping Database and .env Setup (.env file already exists) ---"
+  echo ""
+fi
+
+# --- 3. Backend Deployment ---
+echo "--- 3. Deploying Backend ---"
+cd backend
 
 echo "Installing backend dependencies..."
 npm install
 
+echo "Loading environment variables for Prisma..."
+if [ -f .env ]; then
+  set -o allexport
+  source .env
+  set +o allexport
+else
+  echo "CRITICAL: .env file not found. Cannot run migrations."
+  exit 1
+fi
+
 echo "Running database migrations..."
 npx prisma migrate deploy
 
-echo "Starting backend server with pm2..."
-# The --name flag gives our process a name we can easily reference.
-# `pm2 startup` and `pm2 save` can be used to make it persist on server reboots.
-pm2 start src/server.js --name "$APP_NAME-backend" --update-env
-pm2 save # Save the process list to resurrect on reboot
-pm2 startup # Enable pm2 to start on system boot
+echo "Starting/restarting backend server with pm2..."
+pm2 restart "$APP_NAME-backend" || pm2 start src/server.js --name "$APP_NAME-backend" --update-env
+pm2 save
+pm2 startup
 
 cd ..
 echo ""
@@ -116,20 +113,12 @@ echo "--- 5. Configuring Nginx ---"
 NGINX_CONFIG_PATH="/etc/nginx/sites-available/$APP_NAME"
 echo "Creating Nginx configuration at $NGINX_CONFIG_PATH..."
 
-# Create Nginx config from template
 cp nginx.conf $NGINX_CONFIG_PATH
-
-# Use sed to replace placeholders
 sed -i "s|your_domain.com|$SERVER_NAME|g" $NGINX_CONFIG_PATH
-# Note the use of | as a delimiter to avoid issues with / in the path
 sed -i "s|/path/to/your/app/dist|$APP_PATH/dist|g" $NGINX_CONFIG_PATH
 
 echo "Enabling Nginx site..."
-# Remove default site if it exists and is enabled
-if [ -L "/etc/nginx/sites-enabled/default" ]; then
-    rm /etc/nginx/sites-enabled/default
-fi
-# Enable our site, -f to overwrite if it exists
+if [ -L "/etc/nginx/sites-enabled/default" ]; then rm /etc/nginx/sites-enabled/default; fi
 ln -sf $NGINX_CONFIG_PATH /etc/nginx/sites-enabled/
 
 echo "Testing and restarting Nginx..."
