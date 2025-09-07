@@ -1,21 +1,45 @@
-const logs = [
-  { time: '10:00:01', message: 'BUY SPY 450C @ 1.23' },
-  { time: '10:00:05', message: 'SELL SPY 450C @ 1.25' },
-  { time: '10:01:00', message: 'BUY QQQ 380P @ 2.50' },
-];
+import { useState, useEffect } from 'react';
+import { getOrderLogs } from '../../services/tradeService';
+import { useSocket, useSocketSubscription } from '../../hooks/useSocket';
 
 function OrderLog() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const data = await getOrderLogs();
+        setLogs(data);
+      } catch (error) {
+        // Handle error
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  useSocketSubscription(['orders']);
+  useSocket('orders:execution', (newLog) => {
+    setLogs((prevLogs) => [newLog, ...prevLogs]);
+  });
+
   return (
     <div className="bg-card p-4 rounded-lg">
       <h3 className="text-lg font-semibold mb-4">Order Execution Log</h3>
-      <div className="font-mono text-sm">
-        {logs.map((log, index) => (
-          <div key={index}>
-            <span className="text-muted-foreground mr-2">{log.time}</span>
-            <span>{log.message}</span>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <div className="font-mono text-sm">
+          {logs.map((log, index) => (
+            <div key={index}>
+              <span className="text-muted-foreground mr-2">{new Date(log.ts).toLocaleTimeString()}</span>
+              <span>{log.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

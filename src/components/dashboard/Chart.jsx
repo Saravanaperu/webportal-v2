@@ -1,28 +1,36 @@
+import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useSocket, useSocketSubscription } from '../../hooks/useSocket';
 
-const data = [
-  { name: 'Page A', uv: 4000, pv: 2400, amt: 2400 },
-  { name: 'Page B', uv: 3000, pv: 1398, amt: 2210 },
-  { name: 'Page C', uv: 2000, pv: 9800, amt: 2290 },
-  { name: 'Page D', uv: 2780, pv: 3908, amt: 2000 },
-  { name: 'Page E', uv: 1890, pv: 4800, amt: 2181 },
-  { name: 'Page F', uv: 2390, pv: 3800, amt: 2500 },
-  { name: 'Page G', uv: 3490, pv: 4300, amt: 2100 },
-];
+const MAX_TICKS = 20;
 
-function Chart() {
+function Chart({ symbol = 'NIFTY' }) {
+  const [ticks, setTicks] = useState([]);
+
+  useSocketSubscription([`market:${symbol}`]);
+  useSocket('market:tick', (tick) => {
+    if (tick.symbol === symbol) {
+      setTicks((prevTicks) => {
+        const newTicks = [...prevTicks, tick];
+        if (newTicks.length > MAX_TICKS) {
+          return newTicks.slice(newTicks.length - MAX_TICKS);
+        }
+        return newTicks;
+      });
+    }
+  });
+
   return (
     <div className="bg-card p-4 rounded-lg">
-      <h3 className="text-lg font-semibold mb-4">TradingView Chart (1-min)</h3>
+      <h3 className="text-lg font-semibold mb-4">TradingView Chart (1-min) - {symbol}</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
+        <LineChart data={ticks}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
+          <XAxis dataKey="ts" tickFormatter={(ts) => new Date(ts).toLocaleTimeString()} />
+          <YAxis domain={['dataMin', 'dataMax']} />
           <Tooltip />
           <Legend />
-          <Line type="monotone" dataKey="pv" stroke="#8884d8" activeDot={{ r: 8 }} />
-          <Line type="monotone" dataKey="uv" stroke="#82ca9d" />
+          <Line type="monotone" dataKey="ltp" stroke="#8884d8" dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

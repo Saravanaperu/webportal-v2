@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-function TradeStats() {
+function TradeStats({ winLossRatio, avgRR }) {
   return (
     <Card>
       <CardHeader>
@@ -9,11 +9,11 @@ function TradeStats() {
       <CardContent className="space-y-2">
         <div className="flex justify-between">
           <span>Win/Loss Ratio</span>
-          <span>65%</span>
+          <span>{winLossRatio}%</span>
         </div>
         <div className="flex justify-between">
           <span>Average R:R</span>
-          <span>1.5 : 1</span>
+          <span>{avgRR} : 1</span>
         </div>
       </CardContent>
     </Card>

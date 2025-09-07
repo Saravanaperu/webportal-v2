@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-function PnlStats() {
+function PnlStats({ pnl }) {
+  const pnlColor = pnl >= 0 ? 'text-green-500' : 'text-red-500';
+
   return (
     <Card>
       <CardHeader>
@@ -8,16 +10,10 @@ function PnlStats() {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex justify-between">
-          <span>Daily P&L</span>
-          <span className="text-green-500">+$500</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Weekly P&L</span>
-          <span className="text-green-500">+$2,500</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Monthly P&L</span>
-          <span className="text-red-500">-$1,000</span>
+          <span>P&L</span>
+          <span className={pnlColor}>
+            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+          </span>
         </div>
       </CardContent>
     </Card>
