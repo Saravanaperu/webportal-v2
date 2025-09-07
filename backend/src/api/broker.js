@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import * as angelOneService from '../services/angelOneService.js';
+import { startAngelOneFeed } from '../websocket.js';
 
 const router = Router();
 
 // POST /broker/connect
 router.post('/connect', async (req, res) => {
   try {
-    const { apiKey, clientCode, password, totp } = req.body;
-    const result = await angelOneService.connectToBroker(apiKey, clientCode, password, totp);
+    // The credentials are now read from env vars in the service
+    const result = await angelOneService.connectToBroker();
+    if (result.success) {
+      // Start the WebSocket feed after successful connection
+      startAngelOneFeed();
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });

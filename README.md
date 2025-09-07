@@ -71,6 +71,10 @@ This section explains how to set up and run the backend server.
     Now, edit the `.env` file and provide the correct values for your environment:
     -   `DATABASE_URL`: Your PostgreSQL database connection string.
     -   `JWT_SECRET`: A long, random string for signing JSON Web Tokens.
+    -   `ANGEL_API_KEY`: Your Angel One SmartAPI key.
+    -   `ANGEL_CLIENT_CODE`: Your Angel One client code.
+    -   `ANGEL_PASSWORD`: Your Angel One password.
+    -   `ANGEL_TOTP`: The Time-based One-Time Password from your authenticator app.
 
 4.  **Run database migrations**
 

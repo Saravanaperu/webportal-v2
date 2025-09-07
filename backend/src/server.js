@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import apiRoutes from './api/index.js';
+import { init as initWebSocket } from './websocket.js';
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ const io = new Server(httpServer, {
     origin: '*', // Allow all origins for now
   },
 });
+
+// Initialize WebSocket module
+initWebSocket(io);
 
 const port = process.env.PORT || 3000;
 
@@ -35,30 +39,20 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Mock WebSocket event emitters
+  // I will keep some mock emitters for other events for now
   const interval = setInterval(() => {
-    // pnl:update
     io.to('pnl').emit('pnl:update', {
       realized: Math.random() * 1000,
       unrealized: (Math.random() - 0.5) * 500,
       total: Math.random() * 1500,
     });
-
-    // status:update
     io.to('status').emit('status:update', {
       broker: 'connected',
       strategy: 'Scalper V1',
       ticksPerMin: 60,
       latencyMs: 120,
     });
-
-    // market:tick
-    io.to('market:NIFTY').emit('market:tick', {
-      symbol: 'NIFTY',
-      ltp: 18000 + Math.random() * 100,
-      ts: new Date().getTime(),
-    });
-  }, 2000); // Send updates every 2 seconds
+  }, 2000);
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
