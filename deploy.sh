@@ -28,27 +28,19 @@ echo "All system dependencies are installed."
 echo ""
 
 # --- 2. First-Time Database and .env Setup ---
-# This block only runs if the .env file does not exist.
 if [ ! -f "backend/.env" ]; then
   echo "--- 2. Performing First-Time Database and .env Setup ---"
-  DB_PASS=$(openssl rand -hex 12) # Generate password only on first run
+  DB_PASS=$(openssl rand -hex 12)
 
-  # Create PostgreSQL user and database
   if ! sudo -u postgres psql -t -c '\du' | cut -d \| -f 1 | grep -qw "$DB_USER"; then
       sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';"
       echo "PostgreSQL user '$DB_USER' created."
-  else
-      echo "PostgreSQL user '$DB_USER' already exists. Skipping user creation."
   fi
-
   if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
       sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
       echo "PostgreSQL database '$DB_NAME' created."
-  else
-      echo "PostgreSQL database '$DB_NAME' already exists."
   fi
 
-  # Create .env file
   echo "Creating .env file with new database credentials..."
   DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
   JWT_SECRET=$(openssl rand -hex 32)
@@ -57,15 +49,13 @@ if [ ! -f "backend/.env" ]; then
   cat > .env << EOF
 DATABASE_URL="${DATABASE_URL}"
 JWT_SECRET="${JWT_SECRET}"
-
-# IMPORTANT: Please add your Angel One credentials below
 ANGEL_API_KEY=""
 ANGEL_CLIENT_CODE=""
 ANGEL_PASSWORD=""
 ANGEL_TOTP=""
 EOF
   cd ..
-  echo "IMPORTANT: .env file created in 'backend/' directory. You MUST add your Angel One credentials to it."
+  echo "IMPORTANT: .env file created in 'backend/'. You MUST add your Angel One credentials to it."
   echo ""
 else
   echo "--- 2. Skipping Database and .env Setup (.env file already exists) ---"
@@ -74,20 +64,22 @@ fi
 
 # --- 3. Backend Deployment ---
 echo "--- 3. Deploying Backend ---"
+
+echo "Loading environment variables for Prisma..."
+if [ -f "backend/.env" ]; then
+  set -o allexport
+  . backend/.env
+  set +o allexport
+  echo "backend/.env file loaded."
+else
+  echo "CRITICAL: backend/.env file not found. Cannot run migrations."
+  exit 1
+fi
+
 cd backend
 
 echo "Installing backend dependencies..."
 npm install
-
-echo "Loading environment variables for Prisma..."
-if [ -f .env ]; then
-  set -o allexport
-  source .env
-  set +o allexport
-else
-  echo "CRITICAL: .env file not found. Cannot run migrations."
-  exit 1
-fi
 
 echo "Running database migrations..."
 npx prisma migrate deploy
