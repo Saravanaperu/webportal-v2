@@ -13,18 +13,17 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## Deployment (Full Stack)
 
-This section explains how to deploy the entire full-stack application (frontend and backend) to a bare-metal Linux server.
+This section explains how to perform a fully automated deployment of the application to a fresh Ubuntu server.
 
 ### Prerequisites
 
-Before running the deployment script, ensure your server has:
--   A Linux distribution (e.g., Ubuntu, Debian).
+-   An Ubuntu server (tested on 24.04 LTS).
 -   Root or `sudo` access.
--   A configured PostgreSQL database.
+-   Your domain name or server IP address.
 
-The deployment script will check for `Node.js`, `npm`, `Nginx`, and `pm2`, and will guide you if they are missing.
+### Automated Deployment
 
-### Steps
+The `deploy.sh` script is designed to automate the entire setup process. It will install all necessary software (Nginx, PostgreSQL, Node.js, pm2), configure the database, build the applications, and set up the web server.
 
 1.  **Clone the Repository**
     Clone this repository to your server.
@@ -33,27 +32,27 @@ The deployment script will check for `Node.js`, `npm`, `Nginx`, and `pm2`, and w
     cd <repository-directory>
     ```
 
-2.  **Set Up Backend Environment**
-    The backend requires a `.env` file for its configuration and credentials.
-    -   Navigate to the backend directory: `cd backend`
-    -   Copy the example file: `cp .env.example .env`
-    -   Edit the `.env` file (`nano .env`) and fill in your details for the `DATABASE_URL`, `JWT_SECRET`, and your Angel One API credentials.
-    -   Return to the root directory: `cd ..`
+2.  **Run the Deployment Script**
+    Run the script with `sudo` and pass your server's domain name or IP address as the first argument.
 
-3.  **Run the Deployment Script**
-    The `deploy.sh` script automates the entire setup process for both the frontend and backend.
     ```bash
     chmod +x deploy.sh
-    ./deploy.sh
+    sudo ./deploy.sh your-domain.com
     ```
-    This script will:
-    -   Install dependencies for both frontend and backend.
-    -   Build the frontend for production.
-    -   Run the backend database migrations.
-    -   Start the backend server using `pm2`.
-    -   Provide you with the final Nginx commands to copy, paste, and run.
 
-4.  **Finalize Nginx Configuration**
-    Follow the final instructions printed by the script to configure Nginx. This will involve copying the provided `nginx.conf` file, editing it to include your domain/IP and project path, and restarting the Nginx service.
+    The script will handle the rest.
 
-After these steps, your full-stack trading bot application will be live.
+3.  **Add Angel One Credentials**
+    The final manual step is to add your secret Angel One API credentials to the backend's environment file.
+
+    ```bash
+    sudo nano backend/.env
+    ```
+    Fill in the `ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PASSWORD`, and `ANGEL_TOTP` variables.
+
+    After saving the file, restart the backend process for the changes to take effect:
+    ```bash
+    sudo pm2 restart trading-bot-backend
+    ```
+
+Your application is now fully deployed and accessible at `http://your-domain.com`.
