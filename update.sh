@@ -37,22 +37,22 @@ echo ""
 
 # --- 3. Update Backend ---
 echo "--- 3. Updating Backend ---"
-echo "Navigating to the backend directory..."
+
+echo "Loading environment variables for Prisma..."
+if [ -f "backend/.env" ]; then
+  # A safe way to load environment variables from .env file
+  set -o allexport
+  . backend/.env
+  set +o allexport
+  echo "backend/.env file loaded."
+else
+  echo "Warning: backend/.env file not found. Prisma commands may fail if DATABASE_URL is not set."
+fi
+
 cd backend
 
 echo "Installing/updating backend dependencies..."
 npm install
-
-echo "Loading environment variables for Prisma..."
-if [ -f .env ]; then
-  # A safe way to load environment variables from .env file
-  set -o allexport
-  source .env
-  set +o allexport
-  echo ".env file loaded."
-else
-  echo "Warning: .env file not found. Prisma commands may fail if DATABASE_URL is not set."
-fi
 
 echo "Running any new database migrations..."
 npx prisma migrate deploy
