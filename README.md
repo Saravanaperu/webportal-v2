@@ -76,5 +76,5 @@ After the initial deployment, you can use the `update.sh` script to deploy new c
     -   Pull the latest code.
     -   Install any new dependencies for the frontend and backend.
     -   Re-build the frontend.
-    -   Apply any new database migrations.
+    -   Apply any new database migrations (it will automatically load the credentials from `backend/.env`).
     -   Restart the backend server and Nginx.
