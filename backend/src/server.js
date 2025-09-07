@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import apiRoutes from './api/index.js';
 import { init as initWebSocket } from './websocket.js';
+import { init as initStatusService, start as startStatusService } from './services/statusService.js';
 
 dotenv.config();
 
@@ -17,8 +18,9 @@ const io = new Server(httpServer, {
   },
 });
 
-// Initialize WebSocket module
+// Initialize services
 initWebSocket(io);
+initStatusService(io);
 
 const port = process.env.PORT || 3000;
 
@@ -39,27 +41,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  // I will keep some mock emitters for other events for now
-  const interval = setInterval(() => {
-    io.to('pnl').emit('pnl:update', {
-      realized: Math.random() * 1000,
-      unrealized: (Math.random() - 0.5) * 500,
-      total: Math.random() * 1500,
-    });
-    io.to('status').emit('status:update', {
-      broker: 'connected',
-      strategy: 'Scalper V1',
-      ticksPerMin: 60,
-      latencyMs: 120,
-    });
-  }, 2000);
-
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    clearInterval(interval);
   });
 });
 
 httpServer.listen(port, () => {
   console.log(`Server is running on port ${port}`);
+  // Start the status service after the server is running
+  startStatusService();
 });
