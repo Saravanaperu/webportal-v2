@@ -11,89 +11,49 @@ Currently, two official plugins are available:
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
-## Deployment
+## Deployment (Full Stack)
 
-This section explains how to deploy the application on a bare-metal Linux server using Nginx.
+This section explains how to deploy the entire full-stack application (frontend and backend) to a bare-metal Linux server.
 
-The `deploy.sh` script is designed to simplify the deployment process. It will check for prerequisites, build the application, and provide you with the necessary commands to configure Nginx.
+### Prerequisites
 
-### How to use
+Before running the deployment script, ensure your server has:
+-   A Linux distribution (e.g., Ubuntu, Debian).
+-   Root or `sudo` access.
+-   A configured PostgreSQL database.
 
-1.  **Clone the repository**
+The deployment script will check for `Node.js`, `npm`, `Nginx`, and `pm2`, and will guide you if they are missing.
 
+### Steps
+
+1.  **Clone the Repository**
+    Clone this repository to your server.
     ```bash
     git clone <repository-url>
     cd <repository-directory>
     ```
 
-2.  **Run the deployment script**
+2.  **Set Up Backend Environment**
+    The backend requires a `.env` file for its configuration and credentials.
+    -   Navigate to the backend directory: `cd backend`
+    -   Copy the example file: `cp .env.example .env`
+    -   Edit the `.env` file (`nano .env`) and fill in your details for the `DATABASE_URL`, `JWT_SECRET`, and your Angel One API credentials.
+    -   Return to the root directory: `cd ..`
 
+3.  **Run the Deployment Script**
+    The `deploy.sh` script automates the entire setup process for both the frontend and backend.
     ```bash
     chmod +x deploy.sh
     ./deploy.sh
     ```
+    This script will:
+    -   Install dependencies for both frontend and backend.
+    -   Build the frontend for production.
+    -   Run the backend database migrations.
+    -   Start the backend server using `pm2`.
+    -   Provide you with the final Nginx commands to copy, paste, and run.
 
-    The script will guide you through the rest of the process. It will check if you have Node.js, npm, and Nginx installed, and if not, it will provide you with the commands to install them.
+4.  **Finalize Nginx Configuration**
+    Follow the final instructions printed by the script to configure Nginx. This will involve copying the provided `nginx.conf` file, editing it to include your domain/IP and project path, and restarting the Nginx service.
 
-    After building the application, the script will output the commands you need to run to configure and restart Nginx. Just follow the instructions printed in your terminal.
-
-## Backend Setup
-
-This section explains how to set up and run the backend server.
-
-### Prerequisites
-
--   Node.js and npm
--   A PostgreSQL database
-
-### Steps
-
-1.  **Navigate to the backend directory**
-
-    ```bash
-    cd backend
-    ```
-
-2.  **Install dependencies**
-
-    ```bash
-    npm install
-    ```
-
-3.  **Set up environment variables**
-
-    Create a `.env` file in the `backend` directory by copying the example file:
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    Now, edit the `.env` file and provide the correct values for your environment:
-    -   `DATABASE_URL`: Your PostgreSQL database connection string.
-    -   `JWT_SECRET`: A long, random string for signing JSON Web Tokens.
-    -   `ANGEL_API_KEY`: Your Angel One SmartAPI key.
-    -   `ANGEL_CLIENT_CODE`: Your Angel One client code.
-    -   `ANGEL_PASSWORD`: Your Angel One password.
-    -   `ANGEL_TOTP`: The Time-based One-Time Password from your authenticator app.
-
-4.  **Run database migrations**
-
-    This command will create the necessary tables in your database based on the Prisma schema.
-
-    ```bash
-    npx prisma migrate dev
-    ```
-
-5.  **Start the server**
-
-    -   For development (with auto-reloading):
-        ```bash
-        npm run dev
-        ```
-
-    -   For production:
-        ```bash
-        npm run start
-        ```
-
-    The backend server will be running on `http://localhost:3000`.
+After these steps, your full-stack trading bot application will be live.
