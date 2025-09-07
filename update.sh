@@ -43,6 +43,17 @@ cd backend
 echo "Installing/updating backend dependencies..."
 npm install
 
+echo "Loading environment variables for Prisma..."
+if [ -f .env ]; then
+  # A safe way to load environment variables from .env file
+  set -o allexport
+  source .env
+  set +o allexport
+  echo ".env file loaded."
+else
+  echo "Warning: .env file not found. Prisma commands may fail if DATABASE_URL is not set."
+fi
+
 echo "Running any new database migrations..."
 npx prisma migrate deploy
 
