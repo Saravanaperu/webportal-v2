@@ -15,13 +15,9 @@ If you are developing a production application, we recommend using TypeScript wi
 
 This section explains how to deploy the application on a bare-metal Linux server using Nginx.
 
-### Prerequisites
+The `deploy.sh` script is designed to simplify the deployment process. It will check for prerequisites, build the application, and provide you with the necessary commands to configure Nginx.
 
--   A Linux server with root or sudo access.
--   Node.js and npm installed on the server.
--   Nginx installed on the server.
-
-### Steps
+### How to use
 
 1.  **Clone the repository**
 
@@ -32,50 +28,11 @@ This section explains how to deploy the application on a bare-metal Linux server
 
 2.  **Run the deployment script**
 
-    The `deploy.sh` script will install the dependencies and build the application for production.
-
     ```bash
+    chmod +x deploy.sh
     ./deploy.sh
     ```
 
-    The production-ready files will be in the `dist` directory.
+    The script will guide you through the rest of the process. It will check if you have Node.js, npm, and Nginx installed, and if not, it will provide you with the commands to install them.
 
-3.  **Configure Nginx**
-
-    A sample Nginx configuration is provided in the `nginx.conf` file. You will need to copy this configuration to your Nginx configuration directory and customize it for your server.
-
-    a.  **Copy the configuration:**
-
-        ```bash
-        sudo cp nginx.conf /etc/nginx/sites-available/your-app
-        ```
-
-    b.  **Customize the configuration:**
-
-        Edit the `/etc/nginx/sites-available/your-app` file and replace the placeholders:
-        -   `your_domain.com`: Replace with your server's domain name or IP address.
-        -   `/path/to/your/app/dist`: Replace with the absolute path to the `dist` directory of your application.
-
-    c.  **Enable the site:**
-
-        ```bash
-        sudo ln -s /etc/nginx/sites-available/your-app /etc/nginx/sites-enabled/
-        ```
-
-    d.  **Test the Nginx configuration:**
-
-        ```bash
-        sudo nginx -t
-        ```
-
-    e.  **Restart Nginx:**
-
-        If the test is successful, restart Nginx to apply the changes.
-
-        ```bash
-        sudo systemctl restart nginx
-        ```
-
-4.  **Access your application**
-
-    Your application should now be accessible at `http://your_domain.com`.
+    After building the application, the script will output the commands you need to run to configure and restart Nginx. Just follow the instructions printed in your terminal.
