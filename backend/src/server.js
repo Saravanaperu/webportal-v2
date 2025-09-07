@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import apiRoutes from './api/index.js';
 import { init as initWebSocket } from './websocket.js';
 import { init as initStatusService, start as startStatusService } from './services/statusService.js';
+import { init as initAngelOneService } from './services/angelOneService.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const io = new Server(httpServer, {
 // Initialize services
 initWebSocket(io);
 initStatusService(io);
+initAngelOneService(io);
 
 const port = process.env.PORT || 3000;
 
