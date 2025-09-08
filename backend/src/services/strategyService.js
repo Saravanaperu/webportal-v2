@@ -8,11 +8,11 @@ let strategyConfig = {
   emaPeriod: 20,
   rsiPeriod: 14,
   atrPeriod: 14,
-  atrMultiplier: 1.5, // For setting SL/TP
+  atrMultiplier: 1.5,
 };
 
 let symbolData = {};
-let openTrades = {}; // To track trades opened by the strategy: { "3045": { entryPrice, sl, tp } }
+let openTrades = {};
 
 const updateIndicators = (symbol) => {
   const data = symbolData[symbol];
@@ -32,7 +32,6 @@ const executeScalperV1Strategy = (tick) => {
   const symbol = tick.tk;
   const data = symbolData[symbol];
   if (!data || !data.ema || !data.rsi || !data.atr) return;
-
   const currentPrice = data.prices[data.prices.length - 1];
 
   if (openTrades[symbol]) {
@@ -40,11 +39,9 @@ const executeScalperV1Strategy = (tick) => {
     if (currentPrice >= trade.targetPrice) {
       console.log(`[Scalper V1] TAKE PROFIT for ${symbol} at ${currentPrice}`);
       delete openTrades[symbol];
-      // angelOneService.placeOrder({ ... close order ... });
     } else if (currentPrice <= trade.stopLossPrice) {
       console.log(`[Scalper V1] STOP LOSS for ${symbol} at ${currentPrice}`);
       delete openTrades[symbol];
-      // angelOneService.placeOrder({ ... close order ... });
     }
     return;
   }
@@ -52,24 +49,35 @@ const executeScalperV1Strategy = (tick) => {
   const prevPrice = data.prices[data.prices.length - 2];
   if (prevPrice <= data.ema && currentPrice > data.ema && data.rsi < 70) {
     console.log(`[Scalper V1] BUY SIGNAL for ${symbol} at ${currentPrice}`);
-
     const stopLossPrice = currentPrice - (data.atr * strategyConfig.atrMultiplier);
     const targetPrice = currentPrice + (2 * data.atr * strategyConfig.atrMultiplier);
-
     openTrades[symbol] = { entryPrice: currentPrice, stopLossPrice, targetPrice };
-
-    angelOneService.placeOrder({
-      tradingsymbol: `${symbol}-EQ`,
-      symboltoken: symbol,
-      transactiontype: 'BUY',
-      exchange: 'NSE',
-      ordertype: 'LIMIT',
-      producttype: 'INTRADAY',
-      duration: 'DAY',
-      price: currentPrice,
-      quantity: 1,
-    });
+    angelOneService.placeOrder({ tradingsymbol: `${symbol}-EQ`, symboltoken: symbol, transactiontype: 'BUY', exchange: 'NSE', ordertype: 'LIMIT', producttype: 'INTRADAY', duration: 'DAY', price: currentPrice, quantity: 1 });
   }
+};
+
+const executeMomentumV2Strategy = (tick) => {
+    const symbol = tick.tk;
+    const data = symbolData[symbol];
+    if (!data || !data.ema || !data.rsi) return;
+    const currentPrice = data.prices[data.prices.length - 1];
+
+    if (openTrades[symbol]) {
+      if (currentPrice < data.ema) {
+        console.log(`[Momentum V2] EXIT SIGNAL for ${symbol} at ${currentPrice}`);
+        delete openTrades[symbol];
+      }
+      return;
+    }
+
+    if (data.rsi > 60 && currentPrice > data.ema) {
+      const recentHigh = Math.max(...data.prices.slice(-20));
+      if (currentPrice >= recentHigh) {
+        console.log(`[Momentum V2] BUY SIGNAL for ${symbol} at ${currentPrice}`);
+        openTrades[symbol] = { entryPrice: currentPrice };
+        angelOneService.placeOrder({ tradingsymbol: `${symbol}-EQ`, symboltoken: symbol, transactiontype: 'BUY', exchange: 'NSE', ordertype: 'LIMIT', producttype: 'INTRADAY', duration: 'DAY', price: currentPrice, quantity: 1 });
+      }
+    }
 };
 
 const processTick = (tick) => {
@@ -85,6 +93,8 @@ const processTick = (tick) => {
 
   if (strategyName === 'Scalper V1') {
     executeScalperV1Strategy(tick);
+  } else if (strategyName === 'Momentum V2') {
+    executeMomentumV2Strategy(tick);
   }
 };
 

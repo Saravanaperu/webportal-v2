@@ -4,7 +4,7 @@ import prisma from '../prisma/client.js';
 
 dotenv.config();
 
-let io = null; // To hold the socket.io instance
+let io = null;
 let smartApiInstance = null;
 let sessionData = null;
 
@@ -64,56 +64,57 @@ export const getSessionData = () => {
   return sessionData;
 };
 
-const simulateOrderExecution = async (orderId) => {
-  setTimeout(async () => {
-    try {
-      console.log(`Simulating execution for order: ${orderId}`);
-      const executedOrder = await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'EXECUTED' },
-      });
-      io.to('orders').emit('orders:execution', executedOrder);
-
-      const allTrades = await prisma.trade.findMany({ include: { orders: true } });
-      io.to('trades').emit('trades:update', allTrades);
-    } catch (error) {
-      console.error("Error in simulated execution:", error);
-    }
-  }, 2000); // 2-second delay
-};
-
 export const placeOrder = async (orderDetails) => {
-  if (!smartApiInstance) throw new Error('Not connected to broker');
+    if (!smartApiInstance) throw new Error('Not connected to broker');
 
-  console.log('--- PLACING ORDER (DB & SIMULATION) ---', orderDetails);
-
-  try {
-    // This is a simplified DB interaction. A real app might handle this differently.
-    const newTrade = await prisma.trade.create({
-      data: {
-        symbol: orderDetails.tradingsymbol,
-        entry: orderDetails.price,
-        sl: orderDetails.stoploss || 0,
-        target: orderDetails.target || 0,
-        status: 'Open',
-        orders: {
-          create: {
-            symbol: orderDetails.tradingsymbol,
-            action: orderDetails.transactiontype,
-            status: 'PENDING',
+    // 1. Create a placeholder trade and order in our DB first.
+    let newOrder;
+    try {
+      const newTrade = await prisma.trade.create({
+        data: {
+          symbol: orderDetails.tradingsymbol,
+          entry: orderDetails.price,
+          sl: orderDetails.stoploss || 0,
+          target: orderDetails.target || 0,
+          status: 'Open',
+          orders: {
+            create: {
+              symbol: orderDetails.tradingsymbol,
+              action: orderDetails.transactiontype,
+              status: 'PENDING', // Initially pending
+            },
           },
         },
-      },
-      include: { orders: true },
-    });
+        include: { orders: true },
+      });
+      newOrder = newTrade.orders[0];
+    } catch (dbError) {
+      console.error('Error creating order in DB:', dbError);
+      throw new Error('Failed to create order in local database');
+    }
 
-    const newOrder = newTrade.orders[0];
-    console.log('Order placed in DB, simulating execution...');
-    simulateOrderExecution(newOrder.id);
+    // 2. Place the real order with the broker.
+    console.log('--- PLACING LIVE ORDER ---', orderDetails);
+    try {
+      const orderResponse = await smartApiInstance.placeOrder(orderDetails);
+      console.log('Order placed successfully with broker:', orderResponse);
 
-    return { success: true, orderid: newOrder.id };
-  } catch (error) {
-    console.error('Error placing order in DB:', error);
-    throw new Error('Failed to place order');
-  }
-};
+      // 3. Update our local order with the ID from the broker.
+      if (orderResponse.status && orderResponse.data && orderResponse.data.orderid) {
+          await prisma.order.update({
+              where: { id: newOrder.id },
+              data: { brokerOrderId: orderResponse.data.orderid }
+          });
+      }
+
+      return orderResponse;
+    } catch (brokerError) {
+      // If the broker order fails, update our local order status to 'FAILED'.
+      await prisma.order.update({
+          where: { id: newOrder.id },
+          data: { status: 'FAILED' }
+      });
+      console.error('Error placing order with broker:', brokerError);
+      throw new Error('Failed to place order with broker');
+    }
+  };
