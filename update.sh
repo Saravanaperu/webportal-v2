@@ -3,69 +3,62 @@
 # A script to deploy updates for the full-stack trading bot application.
 #
 # USAGE:
-# sudo ./update.sh
+#   sudo ./update.sh
 #
-# This script must be run with sudo privileges.
+# This script pulls the latest code, updates dependencies, rebuilds the
+# frontend, runs database migrations, and restarts the servers.
+# It must be run with sudo privileges from the project root directory.
 
-# --- Script Setup ---
-# Exit immediately if a command exits with a non-zero status.
-set -e
+# --- Configuration ---
 APP_NAME="trading-bot" # Should match the name in deploy.sh
 
-# Check for root privileges
+# --- Script Setup ---
+set -e
+
+# 1. Validate Script Execution
+echo "--- 1. Validating Execution ---"
 if [ "$EUID" -ne 0 ]; then
-  echo "Please run this script with sudo."
+  echo "Error: Please run this script with sudo."
   exit 1
 fi
+echo ""
 
-# --- 1. Get Latest Code ---
-echo "--- 1. Pulling latest code from Git ---"
-# Stash any local changes to avoid conflicts
+# --- 2. Get Latest Code ---
+echo "--- 2. Pulling latest code from Git ---"
+# Stash any local changes to avoid conflicts, then pull.
 git stash
 git pull origin main # Assuming 'main' is the deployment branch
-git stash pop || true # Apply stashed changes, do nothing if no stash
+# Try to re-apply stashed changes. `|| true` prevents script exit if there's no stash.
+git stash pop || true
 echo "Code updated successfully."
 echo ""
 
-# --- 2. Update Frontend ---
-echo "--- 2. Updating Frontend ---"
+# --- 3. Update Frontend ---
+echo "--- 3. Updating Frontend ---"
 echo "Installing/updating dependencies and rebuilding the React app..."
 npm install
 npm run build
 echo "Frontend build complete."
 echo ""
 
-# --- 3. Update Backend ---
-echo "--- 3. Updating Backend ---"
-
-echo "Loading environment variables for Prisma..."
-if [ -f "backend/.env" ]; then
-  # A safe way to load environment variables from .env file
-  set -o allexport
-  . backend/.env
-  set +o allexport
-  echo "backend/.env file loaded."
-else
-  echo "Warning: backend/.env file not found. Prisma commands may fail if DATABASE_URL is not set."
-fi
-
-cd backend
+# --- 4. Update Backend ---
+echo "--- 4. Updating Backend ---"
 
 echo "Installing/updating backend dependencies..."
-npm install
+npm install --prefix backend
 
 echo "Running any new database migrations..."
-npx prisma migrate deploy
+# Use dotenv-cli to load the .env file for the prisma command
+dotenv -e backend/.env -- npx prisma migrate deploy --schema=backend/prisma/schema.prisma
 
 echo "Restarting backend server with pm2..."
 pm2 restart "$APP_NAME-backend"
 
-cd ..
 echo "Backend server restarted."
 echo ""
 
-# --- 4. Restart Web Server ---
-echo "--- 4. Restarting Nginx ---"
+# --- 5. Restart Web Server ---
+echo "--- 5. Restarting Nginx ---"
 systemctl restart nginx
 echo "Nginx restarted."
 echo ""

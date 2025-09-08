@@ -39,6 +39,8 @@ model Trade {
   sl        Float
   target    Float
   status    String // "Open", "Closed"
+  pnl       Float? // Realized P&L
+  risk      Float? // Initial risk for the trade
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]

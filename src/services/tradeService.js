@@ -19,3 +19,13 @@ export const getOrderLogs = async () => {
     throw error;
   }
 };
+
+export const cancelOrder = async (orderId) => {
+    try {
+      const response = await apiClient.post(`/orders/cancel/${orderId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      throw error;
+    }
+};

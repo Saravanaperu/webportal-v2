@@ -17,7 +17,6 @@ let openTrades = {};
 const updateIndicators = (symbol) => {
   const data = symbolData[symbol];
   if (!data || data.prices.length < strategyConfig.emaPeriod) return;
-
   data.ema = EMA.calculate({ period: strategyConfig.emaPeriod, values: data.prices }).pop();
   if (data.prices.length >= strategyConfig.rsiPeriod) {
     data.rsi = RSI.calculate({ period: strategyConfig.rsiPeriod, values: data.prices }).pop();
@@ -28,7 +27,7 @@ const updateIndicators = (symbol) => {
   }
 };
 
-const executeScalperV1Strategy = (tick) => {
+const executeScalperV1Strategy = async (tick) => {
   const symbol = tick.tk;
   const data = symbolData[symbol];
   if (!data || !data.ema || !data.rsi || !data.atr) return;
@@ -36,11 +35,16 @@ const executeScalperV1Strategy = (tick) => {
 
   if (openTrades[symbol]) {
     const trade = openTrades[symbol];
-    if (currentPrice >= trade.targetPrice) {
+    const stopLossPrice = trade.entry - (trade.initialAtr * strategyConfig.atrMultiplier);
+    const targetPrice = trade.entry + (2 * trade.initialAtr * strategyConfig.atrMultiplier);
+
+    if (currentPrice >= targetPrice) {
       console.log(`[Scalper V1] TAKE PROFIT for ${symbol} at ${currentPrice}`);
+      await angelOneService.closeTrade(trade.id, currentPrice);
       delete openTrades[symbol];
-    } else if (currentPrice <= trade.stopLossPrice) {
+    } else if (currentPrice <= stopLossPrice) {
       console.log(`[Scalper V1] STOP LOSS for ${symbol} at ${currentPrice}`);
+      await angelOneService.closeTrade(trade.id, currentPrice);
       delete openTrades[symbol];
     }
     return;
@@ -49,14 +53,29 @@ const executeScalperV1Strategy = (tick) => {
   const prevPrice = data.prices[data.prices.length - 2];
   if (prevPrice <= data.ema && currentPrice > data.ema && data.rsi < 70) {
     console.log(`[Scalper V1] BUY SIGNAL for ${symbol} at ${currentPrice}`);
-    const stopLossPrice = currentPrice - (data.atr * strategyConfig.atrMultiplier);
-    const targetPrice = currentPrice + (2 * data.atr * strategyConfig.atrMultiplier);
-    openTrades[symbol] = { entryPrice: currentPrice, stopLossPrice, targetPrice };
-    angelOneService.placeOrder({ tradingsymbol: `${symbol}-EQ`, symboltoken: symbol, transactiontype: 'BUY', exchange: 'NSE', ordertype: 'LIMIT', producttype: 'INTRADAY', duration: 'DAY', price: currentPrice, quantity: 1 });
+    const stoplossValue = currentPrice - (data.atr * strategyConfig.atrMultiplier);
+    const orderDetails = {
+        variety: 'NORMAL',
+        tradingsymbol: `${symbol}-EQ`, // This needs to be the correct symbol format
+        symboltoken: symbol,
+        transactiontype: 'BUY',
+        exchange: 'NSE',
+        ordertype: 'LIMIT',
+        producttype: 'INTRADAY',
+        duration: 'DAY',
+        price: String(currentPrice),
+        squareoff: '0',
+        stoploss: String(stoplossValue.toFixed(2)),
+        quantity: '1'
+    };
+    const newTrade = await angelOneService.placeOrder(orderDetails);
+    if(newTrade) {
+        openTrades[symbol] = { id: newTrade.id, entry: newTrade.entry, initialAtr: data.atr };
+    }
   }
 };
 
-const executeMomentumV2Strategy = (tick) => {
+const executeMomentumV2Strategy = async (tick) => {
     const symbol = tick.tk;
     const data = symbolData[symbol];
     if (!data || !data.ema || !data.rsi) return;
@@ -65,6 +84,7 @@ const executeMomentumV2Strategy = (tick) => {
     if (openTrades[symbol]) {
       if (currentPrice < data.ema) {
         console.log(`[Momentum V2] EXIT SIGNAL for ${symbol} at ${currentPrice}`);
+        await angelOneService.closeTrade(openTrades[symbol].id, currentPrice);
         delete openTrades[symbol];
       }
       return;
@@ -74,8 +94,24 @@ const executeMomentumV2Strategy = (tick) => {
       const recentHigh = Math.max(...data.prices.slice(-20));
       if (currentPrice >= recentHigh) {
         console.log(`[Momentum V2] BUY SIGNAL for ${symbol} at ${currentPrice}`);
-        openTrades[symbol] = { entryPrice: currentPrice };
-        angelOneService.placeOrder({ tradingsymbol: `${symbol}-EQ`, symboltoken: symbol, transactiontype: 'BUY', exchange: 'NSE', ordertype: 'LIMIT', producttype: 'INTRADAY', duration: 'DAY', price: currentPrice, quantity: 1 });
+        const orderDetails = {
+            variety: 'NORMAL',
+            tradingsymbol: `${symbol}-EQ`,
+            symboltoken: symbol,
+            transactiontype: 'BUY',
+            exchange: 'NSE',
+            ordertype: 'LIMIT',
+            producttype: 'INTRADAY',
+            duration: 'DAY',
+            price: String(currentPrice),
+            squareoff: '0',
+            stoploss: '0', // No ATR-based SL for this strategy example
+            quantity: '1'
+        };
+        const newTrade = await angelOneService.placeOrder(orderDetails);
+        if (newTrade) {
+            openTrades[symbol] = { id: newTrade.id, entry: newTrade.entry };
+        }
       }
     }
 };
@@ -105,7 +141,6 @@ export const onTick = (ticks) => {
 
 export const start = async (name) => {
   if (isActive) return;
-
   try {
     const config = await prisma.config.findFirst();
     if (config && config.strategyParams) {
@@ -114,7 +149,6 @@ export const start = async (name) => {
   } catch (error) {
     console.error("Could not fetch strategy config, using defaults.", error);
   }
-
   strategyName = name;
   isActive = true;
   symbolData = {};
