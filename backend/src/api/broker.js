@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import * as angelOneService from '../services/angelOneService.js';
-import { startAngelOneFeed } from '../websocket.js';
+import { startAngelOneFeed, startAngelOneOrderFeed } from '../websocket.js';
 
 const router = Router();
 
 // POST /broker/connect
 router.post('/connect', async (req, res) => {
   try {
-    // The credentials are now read from env vars in the service
     const result = await angelOneService.connectToBroker();
     if (result.success) {
-      // Start the WebSocket feed after successful connection
+      // Start both the market data feed and the order feed
       startAngelOneFeed();
+      startAngelOneOrderFeed();
     }
     res.json(result);
   } catch (error) {
